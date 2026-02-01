@@ -1,0 +1,21 @@
+# ---- Python ----
+__pycache__/
+*.pyc
+
+# ---- Virtual environments ----
+ppe_venv/
+venv/
+.venv/
+
+# ---- Secrets ----
+.env
+
+# ---- Generated outputs ----
+reports/
+*.pdf
+*.log
+
+# ---- Model weights (recommended to NOT track normally) ----
+models/*.onnx
+models/*.pt
+models/*.pth
