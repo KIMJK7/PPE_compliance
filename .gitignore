@@ -19,3 +19,7 @@ reports/
 models/*.onnx
 models/*.pt
 models/*.pth
+
+__pycache__/
+*.pyc
+
