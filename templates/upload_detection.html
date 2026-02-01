@@ -1,0 +1,152 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Upload Detection - PPE Compliance</title>
+    <link
+      rel="stylesheet"
+      href="{{ url_for('static', filename='css/browser_detection.css') }}"
+    />
+    <script src="https://cdn.jsdelivr.net/npm/onnxruntime-web/dist/ort.min.js"></script>
+  </head>
+  <body>
+    <!-- Model Loading Overlay -->
+    <div id="loaderOverlay">
+      <div class="loader-card">
+        <div class="loader-spinner"></div>
+        <p class="loader-title">Loading model…</p>
+        <p class="loader-sub">
+          First load may take a few seconds. Please don't close this tab.
+        </p>
+        <div class="loader-progress">
+          <div id="loaderProgressBar"></div>
+        </div>
+        <p id="loaderProgressLabel">0%</p>
+      </div>
+    </div>
+
+    <div class="container">
+      <!-- Header with Navigation -->
+      <div class="header">
+        <h1>🔍 PPE Compliance - Upload Detection</h1>
+        <div class="nav-buttons">
+          <a href="/" class="nav-btn">🏠 Home</a>
+          <a href="/live" class="nav-btn">📹 Live Feed</a>
+          <a href="/dashboard" class="nav-btn" target="_blank">📊 Dashboard</a>
+        </div>
+      </div>
+
+      <div class="panel">
+        <!-- Left Panel: Controls -->
+        <div class="left">
+          <!-- File Upload -->
+          <label class="file-label">
+            <span>📁 Select Image / Video</span>
+            <input type="file" id="fileInput" accept="image/*,video/*" />
+          </label>
+
+          <!-- Control Buttons -->
+          <div class="button-row">
+            <button id="runCheckBtn" disabled>▶️ Run Check</button>
+            <button id="stopBtn" disabled>⏹️ Stop</button>
+            <button id="resetBtn">🔄 Reset</button>
+            <button
+              id="beepToggle"
+              onclick="toggleBeep()"
+              style="background: #10b981"
+            >
+              🔊 Sound: ON
+            </button>
+          </div>
+
+          <!-- Loading Indicator -->
+          <div id="fileLoading" class="loading hidden">Loading file...</div>
+          <div id="uploadToast" class="toast hidden"></div>
+
+          <!-- Confidence Threshold Slider -->
+          <div class="slider-row">
+            <label for="confSlider">
+              Confidence threshold: <span id="confValue">0.25</span>
+            </label>
+            <input
+              type="range"
+              id="confSlider"
+              min="0.10"
+              max="0.90"
+              step="0.05"
+              value="0.25"
+            />
+          </div>
+
+          <!-- Status Box -->
+          <div class="status-box" id="statusBox">
+            <h2>Status</h2>
+            <p id="statusModeText">No file uploaded.</p>
+            <p id="statusMainText"></p>
+            <p id="reasonText"></p>
+            <p>
+              <strong>Detected Classes:</strong> <span id="classesText">-</span>
+            </p>
+            <p>
+              <strong>Total Detections:</strong> <span id="countText">0</span>
+            </p>
+            <p>
+              <strong>Frames processed:</strong>
+              <span id="framesProcessedText">0</span>
+            </p>
+            <p>
+              <strong>Compliant frames:</strong>
+              <span id="framesCompliantText">0</span>
+            </p>
+            <p>
+              <strong>Non-compliant frames:</strong>
+              <span id="framesNonCompliantText">0</span>
+            </p>
+            <p><strong>Progress:</strong> <span id="progressText">0%</span></p>
+          </div>
+        </div>
+
+        <!-- Right Panel: Canvas and Detections -->
+        <div class="right">
+          <canvas id="mainCanvas"></canvas>
+
+          <div class="det-table-box">
+            <h2>Detections</h2>
+            <table id="detTable">
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th>Class</th>
+                  <th>Conf</th>
+                  <th>Box [x1, y1, x2, y2]</th>
+                </tr>
+              </thead>
+              <tbody id="detTableBody">
+                <!-- Rows populated by JavaScript -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- Frame Gallery -->
+      <div class="det-frame-box">
+        <h2>Frame Gallery</h2>
+        <div id="frameGallery" class="frame-gallery">
+          <!-- Thumbnails added by JavaScript -->
+        </div>
+      </div>
+    </div>
+
+    <!-- Hidden Video Element -->
+    <video id="hiddenVideo" style="display: none"></video>
+
+    <!-- Frame Modal for Enlarged View -->
+    <div id="frameModal" class="frame-modal hidden">
+      <img id="frameModalImg" alt="Frame preview" />
+    </div>
+
+    <script src="{{ url_for('static', filename='js/browser_detection.js') }}"></script>
+  </body>
+</html>

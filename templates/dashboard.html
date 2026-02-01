@@ -1,0 +1,680 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Compliance Dashboard</title>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      body {
+        font-family: system-ui, -apple-system, sans-serif;
+        background: linear-gradient(135deg, #0b1120 0%, #1a1f3a 100%);
+        color: #e5e7eb;
+        min-height: 100vh;
+        padding: 20px;
+      }
+
+      .container {
+        max-width: 1400px;
+        margin: 0 auto;
+      }
+
+      .header {
+        text-align: center;
+        margin-bottom: 40px;
+      }
+
+      .header h1 {
+        font-size: 2.5rem;
+        margin-bottom: 10px;
+        background: linear-gradient(135deg, #3b82f6, #22c55e);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+      }
+
+      .header p {
+        color: #9ca3af;
+        font-size: 1.1rem;
+      }
+
+      .stats-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+        gap: 20px;
+        margin-bottom: 40px;
+      }
+
+      .stat-card {
+        background: rgba(31, 41, 55, 0.5);
+        border: 1px solid #374151;
+        border-radius: 12px;
+        padding: 24px;
+        backdrop-filter: blur(10px);
+      }
+
+      .stat-card h3 {
+        color: #9ca3af;
+        font-size: 0.9rem;
+        font-weight: 500;
+        margin-bottom: 8px;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+      }
+
+      .stat-card .value {
+        font-size: 2.5rem;
+        font-weight: 700;
+        margin-bottom: 4px;
+      }
+
+      .stat-card.compliant .value {
+        color: #22c55e;
+      }
+
+      .stat-card.non-compliant .value {
+        color: #ef4444;
+      }
+
+      .stat-card.total .value {
+        color: #3b82f6;
+      }
+
+      .stat-card.rate .value {
+        color: #f59e0b;
+      }
+
+      .actions-bar {
+        display: flex;
+        gap: 12px;
+        margin-bottom: 30px;
+        flex-wrap: wrap;
+      }
+
+      .btn {
+        padding: 12px 24px;
+        border: none;
+        border-radius: 8px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.2s;
+        font-size: 1rem;
+      }
+
+      .btn-primary {
+        background: #3b82f6;
+        color: white;
+      }
+
+      .btn-primary:hover {
+        background: #2563eb;
+        transform: translateY(-2px);
+      }
+
+      .btn-success {
+        background: #22c55e;
+        color: white;
+      }
+
+      .btn-success:hover {
+        background: #16a34a;
+        transform: translateY(-2px);
+      }
+
+      .btn-danger {
+        background: #ef4444;
+        color: white;
+      }
+
+      .btn-danger:hover {
+        background: #dc2626;
+        transform: translateY(-2px);
+      }
+
+      .frames-section {
+        margin-bottom: 40px;
+      }
+
+      .section-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 20px;
+        padding-bottom: 12px;
+        border-bottom: 2px solid #374151;
+      }
+
+      .section-header h2 {
+        font-size: 1.5rem;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+
+      .badge {
+        padding: 4px 12px;
+        border-radius: 999px;
+        font-size: 0.85rem;
+        font-weight: 600;
+      }
+
+      .badge-danger {
+        background: #ef4444;
+        color: white;
+      }
+
+      .badge-success {
+        background: #22c55e;
+        color: white;
+      }
+
+      .frames-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+        gap: 20px;
+      }
+
+      .frame-card {
+        background: rgba(31, 41, 55, 0.5);
+        border: 1px solid #374151;
+        border-radius: 12px;
+        overflow: hidden;
+        transition: transform 0.2s, box-shadow 0.2s;
+      }
+
+      .frame-card:hover {
+        transform: translateY(-4px);
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+      }
+
+      .frame-card.non-compliant {
+        border-color: #ef4444;
+      }
+
+      .frame-card.compliant {
+        border-color: #22c55e;
+      }
+
+      .frame-image {
+        width: 100%;
+        height: 200px;
+        object-fit: cover;
+        cursor: pointer;
+        background: #020617;
+      }
+
+      .frame-details {
+        padding: 16px;
+      }
+
+      .frame-title {
+        font-weight: 600;
+        margin-bottom: 8px;
+        color: #f3f4f6;
+      }
+
+      .frame-info {
+        font-size: 0.85rem;
+        color: #9ca3af;
+        margin-bottom: 4px;
+      }
+
+      .frame-classes {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+        margin-top: 10px;
+      }
+
+      .class-tag {
+        padding: 4px 8px;
+        background: rgba(59, 130, 246, 0.2);
+        border: 1px solid #3b82f6;
+        border-radius: 4px;
+        font-size: 0.75rem;
+        color: #93c5fd;
+      }
+
+      .modal {
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.9);
+        z-index: 1000;
+        justify-content: center;
+        align-items: center;
+      }
+
+      .modal.active {
+        display: flex;
+      }
+
+      .modal-content {
+        max-width: 90%;
+        max-height: 90%;
+        border-radius: 8px;
+      }
+
+      .email-input {
+        padding: 12px;
+        border: 1px solid #374151;
+        border-radius: 8px;
+        background: rgba(31, 41, 55, 0.5);
+        color: #e5e7eb;
+        font-size: 1rem;
+        width: 300px;
+      }
+
+      .loading {
+        display: none;
+        align-items: center;
+        gap: 10px;
+        padding: 12px 24px;
+        background: rgba(59, 130, 246, 0.2);
+        border: 1px solid #3b82f6;
+        border-radius: 8px;
+        color: #93c5fd;
+      }
+
+      .loading.active {
+        display: flex;
+      }
+
+      .spinner {
+        width: 20px;
+        height: 20px;
+        border: 3px solid rgba(147, 197, 253, 0.3);
+        border-top-color: #93c5fd;
+        border-radius: 50%;
+        animation: spin 0.8s linear infinite;
+      }
+
+      @keyframes spin {
+        to {
+          transform: rotate(360deg);
+        }
+      }
+
+      .empty-state {
+        text-align: center;
+        padding: 60px 20px;
+        color: #6b7280;
+      }
+
+      .empty-state svg {
+        width: 80px;
+        height: 80px;
+        margin-bottom: 20px;
+        opacity: 0.5;
+      }
+
+      @media (max-width: 768px) {
+        .header h1 {
+          font-size: 1.8rem;
+        }
+
+        .stats-grid {
+          grid-template-columns: 1fr;
+        }
+
+        .actions-bar {
+          flex-direction: column;
+        }
+
+        .btn {
+          width: 100%;
+        }
+
+        .frames-grid {
+          grid-template-columns: 1fr;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <div class="header">
+        <h1>📊 Compliance Dashboard</h1>
+        <p>Real-time PPE compliance monitoring and reporting</p>
+      </div>
+
+      <div class="stats-grid">
+        <div class="stat-card total">
+          <h3>Total Frames</h3>
+          <div class="value" id="totalFrames">0</div>
+        </div>
+        <div class="stat-card compliant">
+          <h3>✓ Compliant</h3>
+          <div class="value" id="compliantCount">0</div>
+        </div>
+        <div class="stat-card non-compliant">
+          <h3>⚠ Non-Compliant</h3>
+          <div class="value" id="nonCompliantCount">0</div>
+        </div>
+        <div class="stat-card rate">
+          <h3>Compliance Rate</h3>
+          <div class="value" id="complianceRate">0%</div>
+        </div>
+      </div>
+
+      <div class="actions-bar">
+        <button class="btn btn-primary" onclick="refreshData()">
+          🔄 Refresh Data
+        </button>
+        <button class="btn btn-success" onclick="downloadReport()">
+          📄 Download PDF Report
+        </button>
+        <input
+          type="email"
+          class="email-input"
+          id="emailInput"
+          placeholder="Enter email for report"
+        />
+        <button class="btn btn-success" onclick="emailReport()">
+          📧 Email Report
+        </button>
+        <button class="btn btn-danger" onclick="clearAllFrames()">
+          🗑️ Clear All Data
+        </button>
+      </div>
+
+      <div class="loading" id="loadingIndicator">
+        <div class="spinner"></div>
+        <span>Processing...</span>
+      </div>
+
+      <!-- Non-Compliant Frames Section -->
+      <div class="frames-section">
+        <div class="section-header">
+          <h2>
+            ⚠️ Non-Compliant Frames
+            <span class="badge badge-danger" id="nonCompliantBadge">0</span>
+          </h2>
+        </div>
+        <div class="frames-grid" id="nonCompliantGrid">
+          <div class="empty-state">
+            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
+              ></path>
+            </svg>
+            <p>No non-compliant frames detected</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Compliant Frames Section -->
+      <div class="frames-section">
+        <div class="section-header">
+          <h2>
+            ✓ Compliant Frames
+            <span class="badge badge-success" id="compliantBadge">0</span>
+          </h2>
+        </div>
+        <div class="frames-grid" id="compliantGrid">
+          <div class="empty-state">
+            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+              ></path>
+            </svg>
+            <p>No compliant frames yet</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Image Modal -->
+    <div class="modal" id="imageModal" onclick="closeModal()">
+      <img class="modal-content" id="modalImage" alt="Frame preview" />
+    </div>
+
+    <script>
+      let allFrames = { compliant: [], non_compliant: [] };
+
+      // Load data on page load
+      document.addEventListener("DOMContentLoaded", () => {
+        refreshData();
+      });
+
+      async function refreshData() {
+        showLoading(true);
+        try {
+          const response = await fetch("/api/frames");
+          const data = await response.json();
+          allFrames = data;
+
+          updateStats(data);
+          renderFrames(data);
+        } catch (error) {
+          console.error("Error loading frames:", error);
+          alert("Failed to load frames");
+        } finally {
+          showLoading(false);
+        }
+      }
+
+      function updateStats(data) {
+        const total = data.total || 0;
+        const compliant = data.compliant?.length || 0;
+        const nonCompliant = data.non_compliant?.length || 0;
+        const rate = total > 0 ? ((compliant / total) * 100).toFixed(1) : 0;
+
+        document.getElementById("totalFrames").textContent = total;
+        document.getElementById("compliantCount").textContent = compliant;
+        document.getElementById("nonCompliantCount").textContent = nonCompliant;
+        document.getElementById("complianceRate").textContent = rate + "%";
+        document.getElementById("compliantBadge").textContent = compliant;
+        document.getElementById("nonCompliantBadge").textContent = nonCompliant;
+      }
+
+      function renderFrames(data) {
+        // Render non-compliant frames
+        const nonCompliantGrid = document.getElementById("nonCompliantGrid");
+        if (data.non_compliant?.length > 0) {
+          nonCompliantGrid.innerHTML = data.non_compliant
+            .map(
+              (frame, idx) => `
+          <div class="frame-card non-compliant">
+            <img src="${frame.image_data}" alt="Frame ${
+                idx + 1
+              }" class="frame-image" onclick="openModal('${frame.image_data}')">
+            <div class="frame-details">
+              <div class="frame-title">Frame #${idx + 1} - ⚠️ ${
+                frame.reason
+              }</div>
+              <div class="frame-info">📅 ${new Date(
+                frame.timestamp
+              ).toLocaleString()}</div>
+              <div class="frame-info">🎯 Confidence: ${(
+                frame.avg_confidence * 100
+              ).toFixed(1)}%</div>
+              <div class="frame-classes">
+                ${frame.classes
+                  .map((cls) => `<span class="class-tag">${cls}</span>`)
+                  .join("")}
+              </div>
+            </div>
+          </div>
+        `
+            )
+            .join("");
+        } else {
+          nonCompliantGrid.innerHTML = `
+          <div class="empty-state">
+            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+            </svg>
+            <p>No non-compliant frames detected</p>
+          </div>
+        `;
+        }
+
+        // Render compliant frames
+        const compliantGrid = document.getElementById("compliantGrid");
+        if (data.compliant?.length > 0) {
+          compliantGrid.innerHTML = data.compliant
+            .map(
+              (frame, idx) => `
+          <div class="frame-card compliant">
+            <img src="${frame.image_data}" alt="Frame ${
+                idx + 1
+              }" class="frame-image" onclick="openModal('${frame.image_data}')">
+            <div class="frame-details">
+              <div class="frame-title">Frame #${idx + 1} - ✓ ${
+                frame.reason
+              }</div>
+              <div class="frame-info">📅 ${new Date(
+                frame.timestamp
+              ).toLocaleString()}</div>
+              <div class="frame-info">🎯 Confidence: ${(
+                frame.avg_confidence * 100
+              ).toFixed(1)}%</div>
+              <div class="frame-classes">
+                ${frame.classes
+                  .map((cls) => `<span class="class-tag">${cls}</span>`)
+                  .join("")}
+              </div>
+            </div>
+          </div>
+        `
+            )
+            .join("");
+        } else {
+          compliantGrid.innerHTML = `
+          <div class="empty-state">
+            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+            </svg>
+            <p>No compliant frames yet</p>
+          </div>
+        `;
+        }
+      }
+
+      async function downloadReport() {
+        showLoading(true);
+        try {
+          const response = await fetch("/api/report/generate", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+          });
+
+          if (response.ok) {
+            const blob = await response.blob();
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = `compliance_report_${new Date()
+              .toISOString()
+              .slice(0, 10)}.pdf`;
+            a.click();
+            alert("Report downloaded successfully!");
+          } else {
+            throw new Error("Failed to generate report");
+          }
+        } catch (error) {
+          console.error("Error downloading report:", error);
+          alert("Failed to download report");
+        } finally {
+          showLoading(false);
+        }
+      }
+
+      async function emailReport() {
+        const email = document.getElementById("emailInput").value;
+        if (!email) {
+          alert("Please enter an email address");
+          return;
+        }
+
+        if (!email.match(/^[^\s@]+@[^\s@]+\.[^\s@]+$/)) {
+          alert("Please enter a valid email address");
+          return;
+        }
+
+        showLoading(true);
+        try {
+          const response = await fetch("/api/report/generate", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ email }),
+          });
+
+          const data = await response.json();
+          if (data.success) {
+            alert(`Report sent successfully to ${email}!`);
+            document.getElementById("emailInput").value = "";
+          } else {
+            throw new Error(data.error || "Failed to send report");
+          }
+        } catch (error) {
+          console.error("Error emailing report:", error);
+          alert("Failed to send report via email");
+        } finally {
+          showLoading(false);
+        }
+      }
+
+      async function clearAllFrames() {
+        if (
+          !confirm(
+            "Are you sure you want to clear all frames? This cannot be undone."
+          )
+        ) {
+          return;
+        }
+
+        showLoading(true);
+        try {
+          const response = await fetch("/api/frames/clear", {
+            method: "POST",
+          });
+
+          const data = await response.json();
+          if (data.success) {
+            alert("All frames cleared successfully!");
+            refreshData();
+          }
+        } catch (error) {
+          console.error("Error clearing frames:", error);
+          alert("Failed to clear frames");
+        } finally {
+          showLoading(false);
+        }
+      }
+
+      function openModal(imageSrc) {
+        document.getElementById("modalImage").src = imageSrc;
+        document.getElementById("imageModal").classList.add("active");
+      }
+
+      function closeModal() {
+        document.getElementById("imageModal").classList.remove("active");
+      }
+
+      function showLoading(show) {
+        const loading = document.getElementById("loadingIndicator");
+        if (show) {
+          loading.classList.add("active");
+        } else {
+          loading.classList.remove("active");
+        }
+      }
+    </script>
+  </body>
+</html>

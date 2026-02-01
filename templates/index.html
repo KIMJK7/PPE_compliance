@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>PPE Compliance System</title>
+    <link
+      rel="stylesheet"
+      href="{{ url_for('static', filename='css/style.css') }}"
+    />
+    <style>
+      .home {
+        max-width: 900px;
+        margin: 40px auto;
+        padding: 16px;
+      }
+      .card {
+        background: #111827;
+        border: 1px solid #1f2937;
+        border-radius: 12px;
+        padding: 18px;
+        margin: 14px 0;
+      }
+      a.btn {
+        display: inline-block;
+        padding: 10px 16px;
+        border-radius: 10px;
+        background: #3b82f6;
+        color: white;
+        text-decoration: none;
+        font-weight: 600;
+      }
+      a.btn.secondary {
+        background: #8b5cf6;
+      }
+      .muted {
+        color: #9ca3af;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="home">
+      <h1>🦺 PPE Compliance Monitoring</h1>
+      <p class="muted">
+        Flask · Person gating + YOLO compliance detection · Dashboard · PDF +
+        Email
+      </p>
+      <div class="card">
+        <h2>🎥 Live CCTV Feed</h2>
+        <p class="muted">MJPEG stream + live compliance status panel.</p>
+        <a class="btn" href="/live">Open Live Feed</a>
+      </div>
+      <div class="card">
+        <h2>📤 Upload Detection</h2>
+        <p class="muted">
+          Upload images or videos for offline PPE compliance analysis with
+          frame-by-frame processing.
+        </p>
+        <a class="btn" href="/upload_detection">Open Upload Detection</a>
+      </div>
+      <div class="card">
+        <h2>📊 Analytics Dashboard</h2>
+        <p class="muted">
+          Totals, compliance rate, compliant / non-compliant galleries,
+          click-to-enlarge, report tools.
+        </p>
+        <a class="btn secondary" href="/dashboard" target="_blank"
+          >Open Dashboard</a
+        >
+      </div>
+    </div>
+    <script src="{{ url_for('static', filename='js/script.js') }}"></script>
+  </body>
+</html>
