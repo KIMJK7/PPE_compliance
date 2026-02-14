@@ -60,6 +60,7 @@ class PersonDetector:
         try:
             h, w = frame_bgr.shape[:2]
             blob = self._preprocess(frame_bgr)
+            blob = blob.astype(np.float32) 
             outputs = self._session.run(None, {self._input_name: blob})
             dets = parse_yolo_output(outputs, self.input_size, w, h, self.conf_thres, 0.45)
             # COCO person class is 0
@@ -67,3 +68,5 @@ class PersonDetector:
         except Exception as e:
             logger.exception("Person detection failed (fail-open): %s", e)
             return True
+
+
