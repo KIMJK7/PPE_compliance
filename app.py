@@ -63,7 +63,7 @@ def create_app() -> Flask:
     )
     compliance.load()
 
-    store = FrameStore(max_items=s.MAX_GALLERY_ITEMS)
+    store = FrameStore(top_k=2)
     beeper = Beeper(cooldown_sec=s.ALERT_COOLDOWN_SEC, enabled=s.ALERTS_ENABLED)
 
     pipeline = Pipeline(camera=camera, person_detector=person, compliance_detector=compliance, store=store, beeper=beeper)

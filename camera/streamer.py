@@ -4,7 +4,7 @@ import time
 import threading
 import logging
 from dataclasses import dataclass
-from typing import Optional, Tuple, Union
+from typing import Optional, Union
 
 import cv2
 import numpy as np
@@ -13,6 +13,7 @@ logger = logging.getLogger(__name__)
 
 Source = Union[int, str]
 
+
 @dataclass
 class FramePacket:
     frame_bgr: np.ndarray
@@ -20,19 +21,19 @@ class FramePacket:
     width: int
     height: int
 
+
 class CameraReader:
     """Continuously reads frames from RTSP or webcam with auto-reconnect.
 
-    This handles common Windows backends:
-    - Webcam indices: CAP_DSHOW then CAP_MSMF
-    - RTSP/URL: CAP_FFMPEG then default
+    - Webcam: CAP_DSHOW -> CAP_MSMF -> default
+    - RTSP/URL: CAP_FFMPEG -> default
     """
 
     def __init__(self, source: Source, width: int = 640, height: int = 360, max_fps: int = 20):
         self.source = source
         self.width = width
         self.height = height
-        self.max_fps = max(1, max_fps)
+        self.max_fps = max(1, int(max_fps))
 
         self._cap: Optional[cv2.VideoCapture] = None
         self._lock = threading.Lock()
@@ -73,8 +74,8 @@ class CameraReader:
         self._release()
         src = self.source
 
+        # Webcam
         if isinstance(src, int):
-            # webcam
             for backend in [cv2.CAP_DSHOW, cv2.CAP_MSMF, 0]:
                 cap = cv2.VideoCapture(src, backend) if backend != 0 else cv2.VideoCapture(src)
                 if cap.isOpened():
@@ -82,20 +83,32 @@ class CameraReader:
                     break
             if self._cap is None:
                 return False
-            # try set dimensions
+
             self._cap.set(cv2.CAP_PROP_FRAME_WIDTH, self.width)
             self._cap.set(cv2.CAP_PROP_FRAME_HEIGHT, self.height)
             self._cap.set(cv2.CAP_PROP_FPS, self.max_fps)
             return True
 
-        # URL/RTSP
+        # RTSP/URL
         for backend in [cv2.CAP_FFMPEG, 0]:
             cap = cv2.VideoCapture(src, backend) if backend != 0 else cv2.VideoCapture(src)
             if cap.isOpened():
                 self._cap = cap
                 break
+
         if self._cap is None:
             return False
+
+        # Critical for low latency RTSP
+        try:
+            self._cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
+        except Exception:
+            pass
+        try:
+            self._cap.set(cv2.CAP_PROP_FPS, self.max_fps)
+        except Exception:
+            pass
+
         return True
 
     def _loop(self) -> None:
@@ -121,7 +134,6 @@ class CameraReader:
                 time.sleep(0.2)
                 continue
 
-            # resize if requested
             if self.width and self.height:
                 try:
                     frame = cv2.resize(frame, (self.width, self.height))
@@ -130,29 +142,41 @@ class CameraReader:
 
             h, w = frame.shape[:2]
             pkt = FramePacket(frame_bgr=frame, ts=time.time(), width=w, height=h)
+
             with self._lock:
                 self._latest = pkt
 
+            # Webcam: pacing is okay
+            # RTSP: do NOT sleep, drain continuously to avoid latency buildup
             dt = time.time() - t0
-            if dt < desired_dt:
+            if dt < desired_dt and isinstance(self.source, int):
                 time.sleep(desired_dt - dt)
-                
-def generate_frames(reader: CameraReader):
-    """Flask-compatible MJPEG generator"""
+
+
+def generate_frames(reader: CameraReader, fps: int = 12):
+    """Flask MJPEG generator — capped FPS + smaller JPEG for speed."""
+    interval = 1.0 / float(max(1, int(fps)))
+    last = 0.0
+
     while True:
+        now = time.time()
+        if now - last < interval:
+            time.sleep(0.005)
+            continue
+        last = now
+
         pkt = reader.latest()
         if pkt is None:
             time.sleep(0.05)
             continue
 
-        frame = pkt.frame_bgr
-        ret, buffer = cv2.imencode('.jpg', frame)
-        if not ret:
+        ok, buf = cv2.imencode(".jpg", pkt.frame_bgr, [int(cv2.IMWRITE_JPEG_QUALITY), 70])
+        if not ok:
             continue
 
         yield (
-            b'--frame\r\n'
-            b'Content-Type: image/jpeg\r\n\r\n' +
-            buffer.tobytes() +
-            b'\r\n'
+            b"--frame\r\n"
+            b"Content-Type: image/jpeg\r\n\r\n" +
+            buf.tobytes() +
+            b"\r\n"
         )

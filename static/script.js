@@ -1452,3 +1452,176 @@ function setup() {
 }
 
 document.addEventListener("DOMContentLoaded", setup);
+
+/* -------------------------------
+   Dashboard grouped by track_id
+   (Top-K per track) renderer
+-------------------------------- */
+(function () {
+  const nonGrid = document.getElementById("nonCompliantGrid");
+  const comGrid = document.getElementById("compliantGrid");
+  if (!nonGrid || !comGrid) return; // not on dashboard page
+
+  const totalEl = document.getElementById("totalFrames");
+  const compliantCountEl = document.getElementById("compliantCount");
+  const nonCompliantCountEl = document.getElementById("nonCompliantCount");
+  const rateEl = document.getElementById("complianceRate");
+  const compliantBadgeEl = document.getElementById("compliantBadge");
+  const nonCompliantBadgeEl = document.getElementById("nonCompliantBadge");
+  const loadingEl = document.getElementById("loadingIndicator");
+
+  function showLoading(show) {
+    if (!loadingEl) return;
+    if (show) loadingEl.classList.add("active");
+    else loadingEl.classList.remove("active");
+  }
+
+  function escapeHtml(s) {
+    return String(s || "")
+      .replaceAll("&", "&amp;")
+      .replaceAll("<", "&lt;")
+      .replaceAll(">", "&gt;")
+      .replaceAll('"', "&quot;")
+      .replaceAll("'", "&#039;");
+  }
+
+  function flattenTrackMap(trackMap) {
+    const out = [];
+    if (!trackMap) return out;
+    Object.keys(trackMap).forEach((tid) => {
+      const arr = trackMap[tid] || [];
+      arr.forEach((fr) => out.push(fr));
+    });
+    return out;
+  }
+
+  function updateStats(data) {
+    const compliantTracks = data.compliant_tracks || null;
+    const nonTracks = data.non_compliant_tracks || null;
+
+    const compliantFlat =
+      (compliantTracks ? flattenTrackMap(compliantTracks) : null) ||
+      data.compliant ||
+      [];
+    const nonFlat =
+      (nonTracks ? flattenTrackMap(nonTracks) : null) ||
+      data.non_compliant ||
+      [];
+
+    const total =
+      typeof data.total === "number"
+        ? data.total
+        : compliantFlat.length + nonFlat.length;
+
+    const compliant = compliantFlat.length;
+    const nonCompliant = nonFlat.length;
+    const rate = total > 0 ? ((compliant / total) * 100).toFixed(1) : "0.0";
+
+    if (totalEl) totalEl.textContent = String(total);
+    if (compliantCountEl) compliantCountEl.textContent = String(compliant);
+    if (nonCompliantCountEl)
+      nonCompliantCountEl.textContent = String(nonCompliant);
+    if (rateEl) rateEl.textContent = rate + "%";
+    if (compliantBadgeEl) compliantBadgeEl.textContent = String(compliant);
+    if (nonCompliantBadgeEl)
+      nonCompliantBadgeEl.textContent = String(nonCompliant);
+  }
+
+  function frameCardHtml(frame, idx, trackId, bucketLabel) {
+    const img = frame.image_data || "";
+    const ts = escapeHtml(frame.timestamp || "");
+    const reason = escapeHtml(frame.reason || "");
+    const classes = (frame.classes || []).map(escapeHtml).join(", ");
+    const score = Number(frame.avg_confidence || 0);
+    const scorePct = (score * 100).toFixed(1) + "%";
+    const tid = escapeHtml(trackId || frame.track_id || "unknown");
+
+    return `
+      <div class="frame-card ${bucketLabel}">
+        <img src="${img}" alt="Frame ${idx + 1}"
+             class="frame-image"
+             onclick="openModal('${img}')">
+        <div class="frame-details">
+          <div class="frame-title">
+            ${bucketLabel === "non-compliant" ? "Non-Compliant" : "Compliant"}
+            — ${tid} — Frame #${idx + 1}
+          </div>
+          <div class="frame-meta">
+            <div><span class="label">Time:</span> ${ts}</div>
+            <div><span class="label">Reason:</span> ${reason || "-"}</div>
+            <div><span class="label">Classes:</span> ${classes || "-"}</div>
+            <div><span class="label">Score:</span> ${scorePct}</div>
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
+  function renderGrouped(gridEl, trackMap, legacyArr, bucketLabel) {
+    if (trackMap && Object.keys(trackMap).length > 0) {
+      const html = Object.keys(trackMap)
+        .sort()
+        .map((tid) => {
+          const frames = trackMap[tid] || [];
+          const cards = frames
+            .map((fr, i) => frameCardHtml(fr, i, tid, bucketLabel))
+            .join("");
+          return `
+            <div style="grid-column: 1 / -1; margin: 10px 0 4px;">
+              <div style="font-weight: 700; color: #e5e7eb;">
+                Person/Track: ${escapeHtml(tid)} (Top ${frames.length})
+              </div>
+            </div>
+            ${cards}
+          `;
+        })
+        .join("");
+      gridEl.innerHTML = html;
+      return;
+    }
+
+    const arr = legacyArr || [];
+    if (arr.length === 0) {
+      gridEl.innerHTML = `<div style="grid-column:1/-1; color:#9ca3af;">No frames captured.</div>`;
+      return;
+    }
+
+    gridEl.innerHTML = arr
+      .map((fr, i) =>
+        frameCardHtml(fr, i, fr.track_id || "unknown", bucketLabel),
+      )
+      .join("");
+  }
+
+  async function refreshDashboardData() {
+    showLoading(true);
+    try {
+      const res = await fetch("/api/frames", { cache: "no-store" });
+      const data = await res.json();
+      updateStats(data);
+
+      renderGrouped(
+        nonGrid,
+        data.non_compliant_tracks,
+        data.non_compliant,
+        "non-compliant",
+      );
+      renderGrouped(
+        comGrid,
+        data.compliant_tracks,
+        data.compliant,
+        "compliant",
+      );
+    } catch (e) {
+      console.error("Dashboard refresh failed:", e);
+      alert("Failed to load frames");
+    } finally {
+      showLoading(false);
+    }
+  }
+
+  // Expose the same name used by dashboard buttons
+  window.refreshData = refreshDashboardData;
+
+  document.addEventListener("DOMContentLoaded", refreshDashboardData);
+})();

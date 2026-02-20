@@ -115,21 +115,12 @@ async function checkComplianceStatus() {
 
     if (response.status === 503) {
       // No compliance data yet
-      updateComplianceBadge("WAITING", "waiting", "â³");
+      updateComplianceBadge("WAITING", "waiting", "⏳");
       return;
     }
 
     const data = await response.json();
-
-    // Update compliance UI
     updateComplianceUI(data);
-
-    // Update stats
-    if (data.is_compliant) {
-      stats.compliantFrames++;
-    } else {
-      stats.nonCompliantFrames++;
-    }
   } catch (error) {
     console.error("Failed to fetch compliance status:", error);
   }
@@ -173,35 +164,71 @@ function updateStatusUI(data) {
 }
 
 function updateComplianceUI(data) {
-  // Update badge
-  const status = data.is_compliant ? "COMPLIANT" : "NON-COMPLIANT";
-  const badgeClass = data.is_compliant ? "compliant" : "non-compliant";
-  const icon = data.is_compliant ? "âœ…" : "âš ï¸";
+  // Prefer backend status field (COMPLIANT / NON-COMPLIANT / NO_PERSON / ERROR)
+  const backendStatus = (data.status || "").toUpperCase();
 
-  updateComplianceBadge(status, badgeClass, icon);
+  let statusText = "WAITING";
+  let badgeClass = "waiting";
+  let icon = "⏳";
+  let color = "#9ca3af";
 
-  // Update current status
+  if (backendStatus === "NO_PERSON" || data.is_compliant === null) {
+    statusText = "NO PERSON";
+    badgeClass = "waiting";
+    icon = "👤";
+    color = "#9ca3af";
+
+    // Clear UI blocks for empty frames
+    hideViolations();
+    updateDetectedClasses([]);
+    updateConfidenceScores({});
+  } else if (backendStatus === "COMPLIANT" || data.is_compliant === true) {
+    statusText = "COMPLIANT";
+    badgeClass = "compliant";
+    icon = "✅";
+    color = "#22c55e";
+
+    hideViolations();
+  } else if (backendStatus === "NON-COMPLIANT" || data.is_compliant === false) {
+    statusText = "NON-COMPLIANT";
+    badgeClass = "non-compliant";
+    icon = "⚠️";
+    color = "#ef4444";
+
+    if (data.violations && data.violations.length > 0) {
+      showViolations(data.violations);
+    } else {
+      hideViolations();
+    }
+  } else if (backendStatus === "ERROR") {
+    statusText = "ERROR";
+    badgeClass = "non-compliant";
+    icon = "❌";
+    color = "#ef4444";
+  }
+
+  updateComplianceBadge(statusText, badgeClass, icon);
+
   const currentStatus = document.getElementById("currentStatus");
   if (currentStatus) {
-    currentStatus.textContent = status;
-    currentStatus.style.color = data.is_compliant ? "#22c55e" : "#ef4444";
+    currentStatus.textContent = statusText;
+    currentStatus.style.color = color;
   }
 
-  // Update violations
-  if (!data.is_compliant && data.violations && data.violations.length > 0) {
-    showViolations(data.violations);
-  } else {
-    hideViolations();
-  }
-
-  // Update detected classes
-  if (data.detected_classes && data.detected_classes.length > 0) {
+  // Update detected classes + confidence only when meaningful
+  if (
+    Array.isArray(data.detected_classes) &&
+    data.detected_classes.length > 0
+  ) {
     updateDetectedClasses(data.detected_classes);
+  } else if (backendStatus === "NO_PERSON" || data.is_compliant === null) {
+    updateDetectedClasses([]);
   }
 
-  // Update confidence scores
-  if (data.confidence_scores) {
+  if (data.confidence_scores && typeof data.confidence_scores === "object") {
     updateConfidenceScores(data.confidence_scores);
+  } else if (backendStatus === "NO_PERSON" || data.is_compliant === null) {
+    updateConfidenceScores({});
   }
 }
 
@@ -246,32 +273,39 @@ function hideViolations() {
 
 function updateDetectedClasses(classes) {
   const container = document.getElementById("detectedClasses");
-  if (container) {
-    container.innerHTML = classes
-      .map((cls) => `<span class="class-badge">${cls}</span>`)
-      .join("");
+  if (!container) return;
+
+  if (!classes || classes.length === 0) {
+    container.innerHTML =
+      '<span style="color: #6b7280; font-size: 0.85rem">No detections yet</span>';
+    return;
   }
+
+  container.innerHTML = classes
+    .map((cls) => `<span class="class-badge">${cls}</span>`)
+    .join("");
 }
 
 function updateConfidenceScores(scores) {
   const container = document.getElementById("confidenceScores");
-  if (container) {
-    const html = Object.entries(scores)
-      .map(
-        ([cls, conf]) => `
-                <div style="margin-bottom: 6px;">
-                    <span style="color: #e5e7eb;">${cls}:</span>
-                    <span style="color: #3b82f6; font-weight: 600;">${(
-                      conf * 100
-                    ).toFixed(1)}%</span>
-                </div>
-            `,
-      )
-      .join("");
+  if (!container) return;
 
-    container.innerHTML =
-      html || '<span style="color: #6b7280;">No detections</span>';
+  const entries = scores ? Object.entries(scores) : [];
+  if (entries.length === 0) {
+    container.innerHTML = '<span style="color: #6b7280;">No detections</span>';
+    return;
   }
+
+  container.innerHTML = entries
+    .map(
+      ([cls, conf]) => `
+        <div style="margin-bottom: 6px;">
+          <span style="color: #e5e7eb;">${cls}:</span>
+          <span style="color: #3b82f6; font-weight: 600;">${(conf * 100).toFixed(1)}%</span>
+        </div>
+      `,
+    )
+    .join("");
 }
 
 function updateStatsGrid() {

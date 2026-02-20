@@ -5,7 +5,7 @@ import logging
 import urllib.request
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple, Any
 
 import cv2
 import numpy as np
@@ -23,18 +23,21 @@ COMPLIANCE_CLASSES: Dict[int, str] = {
     4: "exposed_beard",
 }
 
+
 @dataclass
 class ComplianceResult:
-    is_compliant: bool
+    # None = no person in frame (no valid detections)
+    is_compliant: Optional[bool]
+    # "COMPLIANT" | "NON-COMPLIANT" | "NO_PERSON" | "ERROR"
     status: str
     reason: str
     detected_classes: List[str]
     confidence_scores: Dict[str, float]
     violations: List[str]
-    detections: List[Dict]
+    detections: List[Dict[str, Any]]
     timestamp: str
 
-    def to_dict(self) -> Dict:
+    def to_dict(self) -> Dict[str, Any]:
         return {
             "is_compliant": self.is_compliant,
             "status": self.status,
@@ -45,6 +48,7 @@ class ComplianceResult:
             "detections": self.detections,
             "timestamp": self.timestamp,
         }
+
 
 class ComplianceDetector:
     """Runs YOLO compliance model (ONNX) and applies rule-based compliance."""
@@ -91,8 +95,9 @@ class ComplianceDetector:
         return blob
 
     def detect(self, frame_bgr: np.ndarray) -> ComplianceResult:
+        ts = datetime.now().isoformat(timespec="seconds")
+
         if self._session is None or self._input_name is None:
-            ts = datetime.now().isoformat(timespec="seconds")
             return ComplianceResult(
                 is_compliant=False,
                 status="ERROR",
@@ -106,6 +111,7 @@ class ComplianceDetector:
 
         h, w = frame_bgr.shape[:2]
         blob = self._preprocess(frame_bgr)
+
         outputs = self._session.run(None, {self._input_name: blob})
         dets_raw = parse_yolo_output(
             outputs,
@@ -117,7 +123,7 @@ class ComplianceDetector:
             num_classes=len(COMPLIANCE_CLASSES),
         )
 
-        detections: List[Dict] = []
+        detections: List[Dict[str, Any]] = []
         detected_names: List[str] = []
         conf_scores: Dict[str, float] = {}
 
@@ -126,16 +132,33 @@ class ComplianceDetector:
             name = COMPLIANCE_CLASSES.get(cls_id, f"unknown_{cls_id}")
             conf = float(d["conf"])
             x1, y1, x2, y2 = [float(v) for v in d["xyxy"]]
-            detections.append({"class_id": cls_id, "class_name": name, "conf": conf, "xyxy": [x1, y1, x2, y2]})
+
+            detections.append(
+                {
+                    "class_id": cls_id,
+                    "class_name": name,
+                    "conf": conf,
+                    "xyxy": [x1, y1, x2, y2],
+                }
+            )
             detected_names.append(name)
+
+            # track max confidence per class name
             if name not in conf_scores or conf > conf_scores[name]:
                 conf_scores[name] = conf
 
         is_compliant, violations, reason = self._apply_rules(detected_names)
-        ts = datetime.now().isoformat(timespec="seconds")
+
+        if is_compliant is None:
+            status = "NO_PERSON"
+        elif is_compliant:
+            status = "COMPLIANT"
+        else:
+            status = "NON-COMPLIANT"
+
         return ComplianceResult(
             is_compliant=is_compliant,
-            status="COMPLIANT" if is_compliant else "NON-COMPLIANT",
+            status=status,
             reason=reason,
             detected_classes=sorted(list(set(detected_names))),
             confidence_scores=conf_scores,
@@ -144,8 +167,19 @@ class ComplianceDetector:
             timestamp=ts,
         )
 
-    def _apply_rules(self, detected: List[str]) -> Tuple[bool, List[str], str]:
+    def _apply_rules(self, detected: List[str]) -> Tuple[Optional[bool], List[str], str]:
         s = set(detected)
+
+        # ── No detections at all → no person in frame ───────────────────────────
+        if not s:
+            return None, [], "no_person_detected"
+
+        # ── Detections present but none are known PPE/compliance classes ─────────
+        # e.g., only "unknown_X" classes appeared -> treat as NO_PERSON
+        known_classes = set(COMPLIANCE_CLASSES.values())
+        if not (s & known_classes):
+            return None, [], "no_person_detected"
+
         violations: List[str] = []
 
         # Non-compliance conditions
@@ -156,7 +190,6 @@ class ComplianceDetector:
         if "exposed_ear" in s and "head_net" not in s:
             violations.append("exposed_ear_without_head_net")
 
-        # Compliance logic
         if violations:
             return False, violations, " / ".join(violations)
 
@@ -166,7 +199,6 @@ class ComplianceDetector:
         if "head_net" in s:
             return True, [], "head_net"
         if "beard_net" in s:
-            # If beard_net but no head_net, still not fully compliant for head hair.
             return False, ["missing_head_net"], "missing_head_net"
 
         return False, ["required_ppe_not_detected"], "required_ppe_not_detected"
