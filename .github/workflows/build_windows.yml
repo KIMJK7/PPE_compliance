@@ -1,0 +1,79 @@
+name: Build Windows EXE
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+          pip install pyinstaller
+
+      - name: Build Windows exe
+        run: |
+          pyinstaller --noconfirm --onedir --windowed `
+            --name "PPE_Compliance" `
+            --add-data "templates;templates" `
+            --add-data "static;static" `
+            --add-data "models;models" `
+            --add-data ".env;." `
+            --add-data "core;core" `
+            --add-data "camera;camera" `
+            --add-data "detectors;detectors" `
+            --add-data "pipeline;pipeline" `
+            --add-data "alerts;alerts" `
+            --add-data "reporting;reporting" `
+            --add-data "routes;routes" `
+            --hidden-import=flask `
+            --hidden-import=flask_cors `
+            --hidden-import=ultralytics `
+            --hidden-import=cv2 `
+            --hidden-import=onnxruntime `
+            --hidden-import=dotenv `
+            --hidden-import=reportlab `
+            --hidden-import=smtplib `
+            --hidden-import=winsound `
+            --collect-all ultralytics `
+            --collect-all onnxruntime `
+            launcher.py
+        shell: pwsh
+
+      - name: Create launcher and reports folder
+        run: |
+          New-Item -ItemType Directory -Force -Path dist\PPE_Compliance\reports
+          $bat = @'
+@echo off
+title PPE Compliance System
+cd /d "%~dp0"
+echo ----------------------------------------
+echo   PPE Compliance System Starting...
+echo   Do NOT close this window!
+echo   Press Ctrl+C to stop the app.
+echo ----------------------------------------
+PPE_Compliance.exe
+echo.
+echo App stopped.
+pause
+'@
+          $bat | Out-File -FilePath "dist\PPE_Compliance\Start PPE Compliance.bat" -Encoding ASCII
+        shell: pwsh
+
+      - name: Zip the build
+        run: Compress-Archive -Path dist\PPE_Compliance\* -DestinationPath PPE_Compliance_Windows.zip
+        shell: pwsh
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: PPE_Compliance_Windows
+          path: PPE_Compliance_Windows.zip
+          retention-days: 7
