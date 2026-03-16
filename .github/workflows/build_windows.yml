@@ -17,6 +17,7 @@ jobs:
         run: |
           pip install -r requirements.txt
           pip install pyinstaller
+        shell: pwsh
 
       - name: Build Windows exe
         run: |
@@ -47,24 +48,14 @@ jobs:
             launcher.py
         shell: pwsh
 
-      - name: Create launcher and reports folder
+      - name: Create reports folder
+        run: New-Item -ItemType Directory -Force -Path dist\PPE_Compliance\reports
+        shell: pwsh
+
+      - name: Create Windows launcher bat
         run: |
-          New-Item -ItemType Directory -Force -Path dist\PPE_Compliance\reports
-          $bat = @'
-@echo off
-title PPE Compliance System
-cd /d "%~dp0"
-echo ----------------------------------------
-echo   PPE Compliance System Starting...
-echo   Do NOT close this window!
-echo   Press Ctrl+C to stop the app.
-echo ----------------------------------------
-PPE_Compliance.exe
-echo.
-echo App stopped.
-pause
-'@
-          $bat | Out-File -FilePath "dist\PPE_Compliance\Start PPE Compliance.bat" -Encoding ASCII
+          $content = "@echo off`r`ntitle PPE Compliance System`r`ncd /d `"%~dp0`"`r`necho Starting...`r`necho Do NOT close this window!`r`nPPE_Compliance.exe`r`npause"
+          [System.IO.File]::WriteAllText("dist\PPE_Compliance\Start PPE Compliance.bat", $content)
         shell: pwsh
 
       - name: Zip the build
